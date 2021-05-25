@@ -4,21 +4,154 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
-    <name>testcontainers-ceph</name>
-    <description>Testcontainers implementation for Ceph, a distributed object, block, and file storage platform .</description>
-    <url>https://github.com/CleverCloud/testcontainers-ceph</url>
     <groupId>com.clever-cloud</groupId>
     <artifactId>testcontainers-ceph</artifactId>
+    <name>testcontainers-ceph</name>
+    <url>https://github.com/CleverCloud/testcontainers-ceph</url>
     <version>1.1.0-SNAPSHOT</version>
+
+    <description>Testcontainers implementation for Ceph, a distributed object, block, and file storage platform .</description>
 
     <properties>
         <maven.compiler.source>11</maven.compiler.source>
         <maven.compiler.target>11</maven.compiler.target>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+
+        <!-- plugins -->
+        <maven-gpg.version>1.6</maven-gpg.version>
+        <maven-source.version>2.2.1</maven-source.version>
+        <maven-javadoc.version>2.9.1</maven-javadoc.version>
+        <nexus-staging-maven.version>1.6.7</nexus-staging-maven.version>
+
+        <!-- dependencies -->
         <commons-lang3.version>3.12.0</commons-lang3.version>
         <testcontainers.version>1.15.3</testcontainers.version>
         <slf4j.version>1.7.25</slf4j.version>
         <awsdk>2.16.68</awsdk>
     </properties>
+
+    <licenses>
+        <license>
+            <name>The Apache License, Version 2.0</name>
+            <url>http://www.apache.org/licenses/LICENSE-2.0.txt</url>
+        </license>
+    </licenses>
+
+    <developers>
+        <developer>
+            <name>Arnaud LEFEBVRE</name>
+            <email>arnaud.lefebvre@clever-cloud.com</email>
+            <organization>Clever Cloud</organization>
+            <organizationUrl>https://clever-cloud.com</organizationUrl>
+        </developer>
+        <developer>
+            <name>Alexandre DUVAL</name>
+            <email>alexandre.duval@clever-cloud.com</email>
+            <organization>Clever Cloud</organization>
+            <organizationUrl>https://clever-cloud.com</organizationUrl>
+        </developer>
+    </developers>
+
+    <scm>
+        <connection>scm:git:https://git@github.com/clevercloud/testcontainers-ceph.git</connection>
+        <developerConnection>scm:git:git@github.com:clevercloud/testcontainers-ceph.git</developerConnection>
+        <url>git@github.com:clevercloud/testcontainers-ceph.git</url>
+    </scm>
+
+    <distributionManagement>
+        <repository>
+            <id>ossrh</id>
+            <name>Central Repository OSSRH</name>
+            <url>https://s01.oss.sonatype.org/service/local/staging/deploy/maven2/</url>
+        </repository>
+    </distributionManagement>
+
+    <repositories>
+        <repository>
+            <id>repository.apache.org-snapshot</id>
+            <url>https://repository.apache.org/snapshots</url>
+            <releases>
+                <enabled>false</enabled>
+            </releases>
+            <snapshots>
+                <enabled>true</enabled>
+            </snapshots>
+        </repository>
+    </repositories>
+
+    <profiles>
+        <profile>
+            <id>deploy</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-gpg-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>sign-artifacts</id>
+                                <phase>verify</phase>
+                                <goals>
+                                    <goal>sign</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                        <configuration>
+                            <gpgArguments>
+                                <arg>--pinentry-mode</arg>
+                                <arg>loopback</arg>
+                            </gpgArguments>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.sonatype.plugins</groupId>
+                <artifactId>nexus-staging-maven-plugin</artifactId>
+                <version>${nexus-staging-maven.version}</version>
+                <extensions>true</extensions>
+                <configuration>
+                    <serverId>ossrh</serverId>
+                    <nexusUrl>https://s01.oss.sonatype.org/</nexusUrl>
+                    <autoReleaseAfterClose>true</autoReleaseAfterClose>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-source-plugin</artifactId>
+                <version>${maven-source.version}</version>
+                <executions>
+                    <execution>
+                        <id>attach-sources</id>
+                        <goals>
+                            <goal>jar-no-fork</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-javadoc-plugin</artifactId>
+                <version>${maven-javadoc.version}</version>
+                <executions>
+                    <execution>
+                        <id>attach-javadocs</id>
+                        <goals>
+                            <goal>jar</goal>
+                        </goals>
+                    </execution>
+                </executions>
+                <configuration>
+                    <additionalparam>-Xdoclint:none</additionalparam>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
 
     <dependencies>
         <dependency>
