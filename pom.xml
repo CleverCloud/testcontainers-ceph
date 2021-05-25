@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <name>testcontainers-ceph</name>
+    <description>Testcontainers implementation for Ceph, a distributed object, block, and file storage platform .</description>
+    <url>https://github.com/CleverCloud/testcontainers-ceph</url>
+    <groupId>com.clever-cloud</groupId>
+    <artifactId>testcontainers-ceph</artifactId>
+    <version>1.0.0-SNAPSHOT</version>
+
+    <properties>
+        <maven.compiler.source>11</maven.compiler.source>
+        <maven.compiler.target>11</maven.compiler.target>
+        <commons-lang3.version>3.12.0</commons-lang3.version>
+        <testcontainers.version>1.15.3</testcontainers.version>
+        <slf4j.version>1.7.25</slf4j.version>
+        <awsdk>2.16.68</awsdk>
+    </properties>
+
+    <dependencies>
+        <dependency>
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-lang3</artifactId>
+            <version>${commons-lang3.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-jdk14</artifactId>
+            <version>${slf4j.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>testcontainers</artifactId>
+            <version>${testcontainers.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>s3</artifactId>
+            <version>${awsdk}</version>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+</project>
