@@ -42,7 +42,7 @@ public class CephContainer extends GenericContainer<CephContainer> {
 
         logger().info("Starting a Ceph container using [{}]", dockerImageName);
         addExposedPorts(CEPH_MON_DEFAULT_PORT, CEPH_RGW_DEFAULT_PORT);
-        addEnv("DEMO_DEMONS", String.join(",", daemons));
+        addEnv("DEMO_DAEMONS", String.join(",", daemons));
         addEnv("CEPH_DEMO_UID", CEPH_DEMO_UID);
         addEnv("CEPH_DEMO_ACCESS_KEY", CEPH_RGW_ACCESS_KEY);
         addEnv("CEPH_DEMO_SECRET_KEY", CEPH_RGW_SECRET_KEY);
