@@ -21,7 +21,7 @@
         <maven-gpg.version>1.6</maven-gpg.version>
         <maven-source.version>2.2.1</maven-source.version>
         <maven-javadoc.version>2.9.1</maven-javadoc.version>
-        <nexus-staging-maven.version>1.6.7</nexus-staging-maven.version>
+        <nexus-staging-maven.version>1.7.0</nexus-staging-maven.version>
 
         <!-- dependencies -->
         <commons-lang3.version>3.12.0</commons-lang3.version>
