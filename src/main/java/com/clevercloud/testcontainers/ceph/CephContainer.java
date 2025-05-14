@@ -1,8 +1,7 @@
 package com.clevercloud.testcontainers.ceph;
 
-import org.apache.commons.lang3.RandomStringUtils;
 import org.testcontainers.containers.GenericContainer;
-import org.testcontainers.containers.wait.strategy.Wait;
+
 import org.testcontainers.utility.DockerImageName;
 
 import java.net.URI;
@@ -10,47 +9,61 @@ import java.net.URISyntaxException;
 import java.time.Duration;
 import java.util.Collections;
 import java.util.HashSet;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class CephContainer extends GenericContainer<CephContainer> {
-    private static final DockerImageName DEFAULT_IMAGE_NAME = DockerImageName.parse("ceph/daemon");
-    private static final String DEFAULT_TAG = "v6.0.3-stable-6.0-pacific-centos-8";
+    private static final DockerImageName DEFAULT_IMAGE_NAME = DockerImageName.parse("clevercloud/testcontainer-ceph");
+    private static final String DEFAULT_TAG = "reef-20250513";
     private static final Integer CEPH_MON_DEFAULT_PORT = 3300;
-    private static final Integer CEPH_RGW_DEFAULT_PORT = 8080;
+    private static final Integer CEPH_RGW_DEFAULT_PORT = 7480;
+    private static final Integer MGR_PORT = 8080;
     private static final String CEPH_DEMO_UID = "admin";
-    private static final String CEPH_RGW_ACCESS_KEY = RandomStringUtils.randomAlphanumeric(32);
-    private static final String CEPH_RGW_SECRET_KEY = RandomStringUtils.randomAlphanumeric(32);
-    private static final String CEPH_END_START = ".*/entrypoint.sh: SUCCESS.*";
-    private static final HashSet<String> CEPH_DEFAULT_DAEMONS = new HashSet<>(Collections.singletonList("all"));
-    private static final String DEFAULT_RGW_NAME = "localhost";
-    private static final Integer DEFAULT_RGW_HTTP_PORT = 8080;
-    private static final String DEFAULT_RGW_PROTOCOL = "http";
+    private static final String CEPH_RGW_ACCESS_KEY = "radosgwadmin";
+    private static final String CEPH_RGW_SECRET_KEY = "radosgwadmin";
+    private static final HashSet<String> CEPH_DEFAULT_FEATURES = new HashSet<>(
+            Collections.singletonList("radosgw rbd"));
+    private static final String CEPH_RGW_PROTOCOL = "http";
+
+    private static final String MGR_USERNAME = "admin";
+    private static final String MGR_PASSWORD = "admin";
 
     public CephContainer() {
         this(DEFAULT_TAG);
     }
 
     public CephContainer(final String tag) {
-        this(DEFAULT_IMAGE_NAME.withTag(tag), CEPH_DEFAULT_DAEMONS);
+        this(DEFAULT_IMAGE_NAME.withTag(tag), CEPH_DEFAULT_FEATURES);
     }
 
-    public CephContainer(final String tag, HashSet<String> daemons) {
-        this(DEFAULT_IMAGE_NAME.withTag(tag), daemons);
+    public CephContainer(final String tag, HashSet<String> features) {
+        this(DEFAULT_IMAGE_NAME.withTag(tag), features);
     }
 
-    public CephContainer(final DockerImageName dockerImageName, HashSet<String> daemons) {
+    private static final Logger log = LoggerFactory.getLogger(CephContainer.class);
+
+    public CephContainer(final DockerImageName dockerImageName, HashSet<String> features) {
         super(dockerImageName);
 
-        logger().info("Starting a Ceph container using [{}]", dockerImageName);
-        addExposedPorts(CEPH_MON_DEFAULT_PORT, CEPH_RGW_DEFAULT_PORT);
-        addEnv("DEMO_DEMONS", String.join(",", daemons));
-        addEnv("CEPH_DEMO_UID", CEPH_DEMO_UID);
-        addEnv("CEPH_DEMO_ACCESS_KEY", CEPH_RGW_ACCESS_KEY);
-        addEnv("CEPH_DEMO_SECRET_KEY", CEPH_RGW_SECRET_KEY);
-        addEnv("NETWORK_AUTO_DETECT", "1");
-        addEnv("RGW_NAME", DEFAULT_RGW_NAME);
-        setCommand("demo");
+        log.info("Starting a Ceph container using [{}]", dockerImageName);
 
-        setWaitStrategy(Wait.forLogMessage(CEPH_END_START, 1).withStartupTimeout(Duration.ofMinutes(5)));
+        addExposedPorts(CEPH_MON_DEFAULT_PORT, CEPH_RGW_DEFAULT_PORT, MGR_PORT);
+        addEnv("FEATURES", String.join(" ", features));
+        addEnv("ACCESS_KEY", CEPH_RGW_ACCESS_KEY);
+        addEnv("SECRET_KEY", CEPH_RGW_SECRET_KEY);
+        addEnv("MGR_USERNAME", MGR_USERNAME);
+        addEnv("MGR_PASSWORD", MGR_PASSWORD);
+        addEnv("NETWORK_AUTO_DETECT", "1");
+
+        setWaitStrategy(new DashboardApiWaitStrategy()
+                .withPort(MGR_PORT)
+                .withUsername(MGR_USERNAME)
+                .withPassword(MGR_PASSWORD)
+                .withTimeout(Duration.ofMinutes(2)));
+    }
+
+    public String getDashboardApiUrl() {
+        return String.format("http://%s:%d/api", getHost(), getMappedPort(MGR_PORT));
     }
 
     public String getDefaultTag() {
@@ -62,7 +75,7 @@ public class CephContainer extends GenericContainer<CephContainer> {
     }
 
     public Integer getRGWHTTPPort() {
-        return getMappedPort(DEFAULT_RGW_HTTP_PORT);
+        return getMappedPort(CEPH_RGW_DEFAULT_PORT);
     }
 
     public String getRGWHTTPHostAddress() {
@@ -86,6 +99,6 @@ public class CephContainer extends GenericContainer<CephContainer> {
     }
 
     public String getRGWProtocol() {
-        return DEFAULT_RGW_PROTOCOL;
+        return CEPH_RGW_PROTOCOL;
     }
 }
