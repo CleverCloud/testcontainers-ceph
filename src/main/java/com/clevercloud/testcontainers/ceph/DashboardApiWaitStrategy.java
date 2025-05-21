@@ -67,14 +67,14 @@ public class DashboardApiWaitStrategy implements WaitStrategy {
                     os.write(postData);
                 }
                 int responseCode = conn.getResponseCode();
-                log.info("[DashboardApiWaitStrategy] Try #{}: POST {} with body {} -> HTTP {}", tryCount, urlStr, body,
+                log.trace("[DashboardApiWaitStrategy] Try #{}: POST {} with body {} -> HTTP {}", tryCount, urlStr, body,
                         responseCode);
                 if (responseCode == 201) {
                     log.info("[DashboardApiWaitStrategy] Dashboard API ready after {} tries.", tryCount);
                     return;
                 }
             } catch (Exception e) {
-                log.warn("[DashboardApiWaitStrategy] Try #{}: Exception during POST {} with body {}: {}", tryCount,
+                log.trace("[DashboardApiWaitStrategy] Try #{}: Exception during POST {} with body {}: {}", tryCount,
                         urlStr, body, e.getMessage());
                 lastException = e;
             }

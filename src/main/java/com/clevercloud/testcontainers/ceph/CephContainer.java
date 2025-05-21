@@ -62,6 +62,14 @@ public class CephContainer extends GenericContainer<CephContainer> {
                 .withTimeout(Duration.ofMinutes(2)));
     }
 
+    public String getDashboardUsername() {
+        return MGR_USERNAME;
+    }
+
+    public String getDashboardPassword() {
+        return MGR_PASSWORD;
+    }
+
     public String getDashboardApiUrl() {
         return String.format("http://%s:%d/api", getHost(), getMappedPort(MGR_PORT));
     }
