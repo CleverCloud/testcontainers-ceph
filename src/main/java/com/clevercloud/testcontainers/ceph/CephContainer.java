@@ -14,7 +14,7 @@ import org.slf4j.LoggerFactory;
 
 public class CephContainer extends GenericContainer<CephContainer> {
     private static final DockerImageName DEFAULT_IMAGE_NAME = DockerImageName.parse("clevercloud/testcontainer-ceph");
-    private static final String DEFAULT_TAG = "reef-20250513";
+    private static final String DEFAULT_TAG = "reef-20250721";
     private static final Integer CEPH_MON_DEFAULT_PORT = 3300;
     private static final Integer CEPH_RGW_DEFAULT_PORT = 7480;
     private static final Integer MGR_PORT = 8080;
@@ -22,7 +22,7 @@ public class CephContainer extends GenericContainer<CephContainer> {
     private static final String CEPH_RGW_ACCESS_KEY = "radosgwadmin";
     private static final String CEPH_RGW_SECRET_KEY = "radosgwadmin";
     private static final HashSet<String> CEPH_DEFAULT_FEATURES = new HashSet<>(
-            Collections.singletonList("radosgw rbd"));
+            Collections.singletonList("radosgw rbd mon"));
     private static final String CEPH_RGW_PROTOCOL = "http";
 
     private static final String MGR_USERNAME = "admin";
@@ -108,5 +108,9 @@ public class CephContainer extends GenericContainer<CephContainer> {
 
     public String getRGWProtocol() {
         return CEPH_RGW_PROTOCOL;
+    }
+
+    public Integer getMONPort() {
+        return getMappedPort(CEPH_MON_DEFAULT_PORT);
     }
 }

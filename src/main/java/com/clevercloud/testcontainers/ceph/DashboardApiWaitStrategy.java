@@ -2,6 +2,7 @@ package com.clevercloud.testcontainers.ceph;
 
 import org.testcontainers.containers.wait.strategy.WaitStrategy;
 import java.net.HttpURLConnection;
+import java.net.URI;
 import java.net.URL;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
@@ -57,7 +58,7 @@ public class DashboardApiWaitStrategy implements WaitStrategy {
         while (System.currentTimeMillis() - start < timeout.toMillis()) {
             tryCount++;
             try {
-                URL url = new URL(urlStr);
+                URL url = new URI(urlStr).toURL();
                 HttpURLConnection conn = (HttpURLConnection) url.openConnection();
                 conn.setRequestMethod("POST");
                 conn.setRequestProperty("accept", "application/vnd.ceph.api.v1.0+json");

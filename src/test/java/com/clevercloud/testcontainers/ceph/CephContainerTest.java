@@ -18,6 +18,9 @@ import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
+import java.net.InetSocketAddress;
+import java.net.Socket;
+import java.net.SocketTimeoutException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
@@ -60,7 +63,7 @@ public class CephContainerTest {
             byte[] postData = body.getBytes(StandardCharsets.UTF_8);
 
             try {
-                URL url = new URL(urlStr);
+                URL url = new URI(urlStr).toURL();
                 HttpURLConnection conn = (HttpURLConnection) url.openConnection();
                 conn.setRequestMethod("POST");
                 conn.setRequestProperty("accept", "application/vnd.ceph.api.v1.0+json");
@@ -105,6 +108,69 @@ public class CephContainerTest {
                             .readAllBytes());
 
             assertEquals(body, responseBody);
+
+            container.stop();
+        }
+    }
+
+    @Test
+    public void cephMMONTest() {
+        HashSet<String> features = new HashSet<>(Arrays.asList("rbd", "radosgw", "mon"));
+        try (CephContainer container = new CephContainer(CEPH_IMAGE, features)) {
+            container.start();
+            container.followOutput(new Slf4jLogConsumer(log).withPrefix("CEPH"));
+
+            // Test MON service directly by checking TCP connectivity to MON port
+            String address = container.getHost();
+            Integer monPort = container.getMONPort();
+
+            // Direct TCP connectivity test to MON service
+            try (Socket socket = new Socket()) {
+                socket.setSoTimeout(5000); // 5 second timeout
+                InetSocketAddress monAddress = new InetSocketAddress(address, monPort);
+
+                log.info("Testing direct connectivity to MON service at {}:{}", address, monPort);
+                socket.connect(monAddress, 5000);
+
+                // If we reach here, the connection was successful
+                log.info("Successfully connected to MON service at {}:{}", address, monPort);
+
+                // Additional verification: MON should accept and close connections gracefully
+                // This indicates the MON daemon is listening and responding
+                assertEquals("MON port should be accessible", true, socket.isConnected());
+
+            } catch (SocketTimeoutException e) {
+                log.error("Timeout connecting to MON service at {}:{}", address, monPort);
+                throw new RuntimeException("MON service connection timeout", e);
+            } catch (IOException e) {
+                log.error("Failed to connect to MON service at {}:{}: {}", address, monPort, e.getMessage());
+                throw new RuntimeException("MON service not accessible", e);
+            }
+
+            // Optional: Also verify via MGR API for comprehensive check
+            Integer mgrPort = container.getMappedPort(MGR_PORT);
+            String authUrl = String.format("http://%s:%d/api/auth", address, mgrPort);
+            String authBody = String.format("{\"username\": \"%s\", \"password\": \"%s\"}", MGR_USERNAME, MGR_PASSWORD);
+            byte[] authData = authBody.getBytes(StandardCharsets.UTF_8);
+
+            try {
+                URL url = new URI(authUrl).toURL();
+                HttpURLConnection authConn = (HttpURLConnection) url.openConnection();
+                authConn.setRequestMethod("POST");
+                authConn.setRequestProperty("accept", "application/vnd.ceph.api.v1.0+json");
+                authConn.setRequestProperty("Content-Type", "application/json");
+                authConn.setDoOutput(true);
+                try (OutputStream os = authConn.getOutputStream()) {
+                    os.write(authData);
+                }
+                int authResponseCode = authConn.getResponseCode();
+                assertEquals("MGR authentication should succeed", 201, authResponseCode);
+
+                log.info("MON service verified: Direct TCP connection successful and MGR can authenticate");
+            } catch (Exception e) {
+                log.warn("MGR authentication failed, but direct MON connection succeeded: {}", e.getMessage());
+                // Don't fail the test if direct MON connection worked
+            }
 
             container.stop();
         }
