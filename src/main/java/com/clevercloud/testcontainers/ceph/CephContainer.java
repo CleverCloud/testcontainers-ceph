@@ -113,4 +113,33 @@ public class CephContainer extends GenericContainer<CephContainer> {
     public Integer getMONPort() {
         return getMappedPort(CEPH_MON_DEFAULT_PORT);
     }
+
+    /**
+     * Retrieves the Ceph cluster ID (FSID) from the running container.
+     * The cluster ID is a unique identifier for the Ceph cluster.
+     * 
+     * @return the Ceph cluster ID as a String
+     * @throws RuntimeException if the cluster ID cannot be retrieved
+     */
+    public String getClusterId() {
+        try {
+            // Execute ceph fsid command to get the cluster ID
+            org.testcontainers.containers.Container.ExecResult result = execInContainer("ceph", "fsid");
+
+            if (result.getExitCode() != 0) {
+                throw new RuntimeException("Failed to retrieve cluster ID. Exit code: " + result.getExitCode() +
+                        ", stderr: " + result.getStderr());
+            }
+
+            String clusterId = result.getStdout().trim();
+            if (clusterId.isEmpty()) {
+                throw new RuntimeException("Cluster ID is empty");
+            }
+
+            log.debug("Retrieved Ceph cluster ID: {}", clusterId);
+            return clusterId;
+        } catch (Exception e) {
+            throw new RuntimeException("Error retrieving Ceph cluster ID", e);
+        }
+    }
 }

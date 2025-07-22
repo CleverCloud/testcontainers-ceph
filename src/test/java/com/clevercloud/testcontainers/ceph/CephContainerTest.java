@@ -175,4 +175,16 @@ public class CephContainerTest {
             container.stop();
         }
     }
+
+    @Test
+    public void cephClusterIdTest() {
+        HashSet<String> features = new HashSet<>(Arrays.asList("rbd", "radosgw", "mon"));
+        try (CephContainer container = new CephContainer(CEPH_IMAGE, features)) {
+            container.start();
+            container.followOutput(new Slf4jLogConsumer(log).withPrefix("CEPH"));
+            String clusterId = container.getClusterId();
+            assertEquals("Cluster ID should not be empty", true, clusterId != null && !clusterId.isEmpty());
+            container.stop();
+        }
+    }
 }
