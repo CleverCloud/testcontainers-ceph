@@ -1,7 +1,7 @@
 package com.clevercloud.testcontainers.ceph;
 
 import org.apache.commons.lang3.RandomStringUtils;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.output.Slf4jLogConsumer;
@@ -28,7 +28,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.HashSet;
 
-import static org.junit.Assert.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 public class CephContainerTest {
     private static final Logger log = LoggerFactory.getLogger(CephContainerTest.class);
@@ -137,7 +137,7 @@ public class CephContainerTest {
 
                 // Additional verification: MON should accept and close connections gracefully
                 // This indicates the MON daemon is listening and responding
-                assertEquals("MON port should be accessible", true, socket.isConnected());
+                assertEquals(true, socket.isConnected(), "MON port should be accessible");
 
             } catch (SocketTimeoutException e) {
                 log.error("Timeout connecting to MON service at {}:{}", address, monPort);
@@ -164,7 +164,7 @@ public class CephContainerTest {
                     os.write(authData);
                 }
                 int authResponseCode = authConn.getResponseCode();
-                assertEquals("MGR authentication should succeed", 201, authResponseCode);
+                assertEquals(201, authResponseCode, "MGR authentication should succeed");
 
                 log.info("MON service verified: Direct TCP connection successful and MGR can authenticate");
             } catch (Exception e) {
@@ -183,7 +183,7 @@ public class CephContainerTest {
             container.start();
             container.followOutput(new Slf4jLogConsumer(log).withPrefix("CEPH"));
             String clusterId = container.getClusterId();
-            assertEquals("Cluster ID should not be empty", true, clusterId != null && !clusterId.isEmpty());
+            assertEquals(true, clusterId != null && !clusterId.isEmpty(), "Cluster ID should not be empty");
             container.stop();
         }
     }
