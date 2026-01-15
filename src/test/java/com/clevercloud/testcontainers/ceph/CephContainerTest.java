@@ -171,4 +171,41 @@ public class CephContainerTest {
         assertNotNull(clusterId, "Cluster ID should not be null");
         assertFalse(clusterId.isEmpty(), "Cluster ID should not be empty");
     }
+
+    @Test
+    public void cephHostByIpTest() {
+        // Get the container's IP address using the helper method
+        String containerIp = container.getContainerIpAddress();
+
+        log.info("Container IP address: {}", containerIp);
+
+        assertNotNull(containerIp, "Container IP should not be null");
+        assertFalse(containerIp.isEmpty(), "Container IP should not be empty");
+        assertFalse(containerIp.equals("localhost"), "Container IP should not be localhost");
+        assertFalse(containerIp.equals("127.0.0.1"), "Container IP should not be 127.0.0.1");
+
+        // Verify we can connect to MGR API using the container's IP (not localhost)
+        // Note: We use the internal port since we're connecting directly to container IP
+        String urlStr = String.format("http://%s:%d/api/auth", containerIp, MGR_PORT);
+        String body = String.format("{\"username\": \"%s\", \"password\": \"%s\"}", MGR_USERNAME, MGR_PASSWORD);
+        byte[] postData = body.getBytes(StandardCharsets.UTF_8);
+
+        try {
+            URL url = new URI(urlStr).toURL();
+            HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+            conn.setRequestMethod("POST");
+            conn.setRequestProperty("accept", "application/vnd.ceph.api.v1.0+json");
+            conn.setRequestProperty("Content-Type", "application/json");
+            conn.setDoOutput(true);
+            try (OutputStream os = conn.getOutputStream()) {
+                os.write(postData);
+            }
+            int responseCode = conn.getResponseCode();
+            assertEquals(201, responseCode, "Should be able to authenticate using host address");
+            log.info("Successfully connected to MGR API at {}", urlStr);
+        } catch (Exception e) {
+            log.warn("Exception during connection test: {}", e.getMessage());
+            throw new RuntimeException(e);
+        }
+    }
 }

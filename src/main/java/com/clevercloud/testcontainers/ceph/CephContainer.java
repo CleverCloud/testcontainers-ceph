@@ -119,6 +119,16 @@ public class CephContainer extends GenericContainer<CephContainer> {
     }
 
     /**
+     * Returns the container's IP address from Docker network settings.
+     * This returns the actual IP address, not localhost.
+     *
+     * @return the container's IP address
+     */
+    public String getContainerIpAddress() {
+        return getContainerInfo().getNetworkSettings().getIpAddress();
+    }
+
+    /**
      * Retrieves the Ceph cluster ID (FSID) from the running container.
      * The cluster ID is a unique identifier for the Ceph cluster.
      * 
