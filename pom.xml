@@ -8,7 +8,7 @@
     <artifactId>testcontainers-ceph</artifactId>
     <name>testcontainers-ceph</name>
     <url>https://github.com/CleverCloud/testcontainers-ceph</url>
-    <version>20251204-reef</version>
+    <version>20260115-reef</version>
 
     <description>Testcontainers implementation for Ceph, a distributed object, block, and file storage platform .</description>
 
