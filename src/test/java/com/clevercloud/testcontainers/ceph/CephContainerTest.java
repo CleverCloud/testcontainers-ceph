@@ -29,6 +29,8 @@ import java.util.Arrays;
 import java.util.HashSet;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 public class CephContainerTest {
     private static final Logger log = LoggerFactory.getLogger(CephContainerTest.class);
@@ -40,151 +42,133 @@ public class CephContainerTest {
     private static final String MGR_PASSWORD = "admin";
     private static final Integer MGR_PORT = 8080;
 
+    // Shared container for all tests - uses all features needed by tests
+    private static final CephContainer container = new CephContainer(CEPH_IMAGE,
+            new HashSet<>(Arrays.asList("rbd", "radosgw", "mon")));
+
+    @org.junit.jupiter.api.BeforeAll
+    static void startContainer() {
+        container.start();
+        container.followOutput(new Slf4jLogConsumer(log).withPrefix("CEPH"));
+    }
+
+    @org.junit.jupiter.api.AfterAll
+    static void stopContainer() {
+        container.stop();
+    }
+
     @Test
     public void cephDefaultTest() {
-        try (CephContainer container = new CephContainer(CEPH_IMAGE)) {
-            container.start();
-            container.followOutput(new Slf4jLogConsumer(log).withPrefix("CEPH"));
-            container.stop();
-        }
+        // Container is already running, just verify it's accessible
+        assertNotNull(container.getHost());
     }
 
     @Test
     public void cephRBDTest() {
-        HashSet<String> features = new HashSet<>(Arrays.asList("rbd"));
-        try (CephContainer container = new CephContainer(CEPH_IMAGE, features)) {
-            container.start();
+        String address = container.getHost();
+        Integer mappedPort = container.getMappedPort(MGR_PORT);
+        String urlStr = String.format("http://%s:%d/api/auth", address, mappedPort);
+        String body = String.format("{\"username\": \"%s\", \"password\": \"%s\"}", MGR_USERNAME, MGR_PASSWORD);
+        byte[] postData = body.getBytes(StandardCharsets.UTF_8);
 
-            container.followOutput(new Slf4jLogConsumer(log).withPrefix("CEPH"));
-            String address = container.getHost();
-            Integer mappedPort = container.getMappedPort(MGR_PORT);
-            String urlStr = String.format("http://%s:%d/api/auth", address, mappedPort);
-            String body = String.format("{\"username\": \"%s\", \"password\": \"%s\"}", MGR_USERNAME, MGR_PASSWORD);
-            byte[] postData = body.getBytes(StandardCharsets.UTF_8);
-
-            try {
-                URL url = new URI(urlStr).toURL();
-                HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-                conn.setRequestMethod("POST");
-                conn.setRequestProperty("accept", "application/vnd.ceph.api.v1.0+json");
-                conn.setRequestProperty("Content-Type", "application/json");
-                conn.setDoOutput(true);
-                try (OutputStream os = conn.getOutputStream()) {
-                    os.write(postData);
-                }
-                int responseCode = conn.getResponseCode();
-                assertEquals(201, responseCode);
-            } catch (Exception e) {
-                log.warn("Exception during POST {} with body {}: {}", urlStr, body, e.getMessage());
-                throw new RuntimeException(e);
+        try {
+            URL url = new URI(urlStr).toURL();
+            HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+            conn.setRequestMethod("POST");
+            conn.setRequestProperty("accept", "application/vnd.ceph.api.v1.0+json");
+            conn.setRequestProperty("Content-Type", "application/json");
+            conn.setDoOutput(true);
+            try (OutputStream os = conn.getOutputStream()) {
+                os.write(postData);
             }
-
-            container.stop();
+            int responseCode = conn.getResponseCode();
+            assertEquals(201, responseCode);
+        } catch (Exception e) {
+            log.warn("Exception during POST {} with body {}: {}", urlStr, body, e.getMessage());
+            throw new RuntimeException(e);
         }
     }
 
     @Test
     public void cephRGWTest() throws URISyntaxException, IOException {
-        HashSet<String> features = new HashSet<>(Arrays.asList("rbd", "radosgw"));
+        URI endpointUri = container.getRGWUri();
+        AwsBasicCredentials awsCreds = AwsBasicCredentials.create(container.getRGWAccessKey(),
+                container.getRGWSecretKey());
+        S3Client s3 = S3Client.builder().endpointOverride(endpointUri).region(Region.of("default"))
+                .credentialsProvider(StaticCredentialsProvider.create(awsCreds)).build();
+        s3.createBucket(CreateBucketRequest.builder().bucket(RGW_BUCKET_TEST).build());
+        s3.waiter().waitUntilBucketExists(HeadBucketRequest.builder().bucket(RGW_BUCKET_TEST).build());
 
-        try (CephContainer container = new CephContainer(CEPH_IMAGE, features)) {
-            container.start();
-            container.followOutput(new Slf4jLogConsumer(log).withPrefix("CEPH"));
+        String body = RandomStringUtils.random(1024);
 
-            URI endpointUri = container.getRGWUri();
-            AwsBasicCredentials awsCreds = AwsBasicCredentials.create(container.getRGWAccessKey(),
-                    container.getRGWSecretKey());
-            S3Client s3 = S3Client.builder().endpointOverride(endpointUri).region(Region.of("default"))
-                    .credentialsProvider(StaticCredentialsProvider.create(awsCreds)).build();
-            s3.createBucket(CreateBucketRequest.builder().bucket(RGW_BUCKET_TEST).build());
-            s3.waiter().waitUntilBucketExists(HeadBucketRequest.builder().bucket(RGW_BUCKET_TEST).build());
+        s3.putObject(PutObjectRequest.builder().bucket(RGW_BUCKET_TEST).key(RGW_BUCKET_OBJECT_TEST).build(),
+                RequestBody.fromBytes(body.getBytes(StandardCharsets.UTF_8)));
+        String responseBody = new String(
+                s3.getObject(GetObjectRequest.builder().bucket(RGW_BUCKET_TEST).key(RGW_BUCKET_OBJECT_TEST).build())
+                        .readAllBytes());
 
-            String body = RandomStringUtils.random(1024);
-
-            s3.putObject(PutObjectRequest.builder().bucket(RGW_BUCKET_TEST).key(RGW_BUCKET_OBJECT_TEST).build(),
-                    RequestBody.fromBytes(body.getBytes(StandardCharsets.UTF_8)));
-            String responseBody = new String(
-                    s3.getObject(GetObjectRequest.builder().bucket(RGW_BUCKET_TEST).key(RGW_BUCKET_OBJECT_TEST).build())
-                            .readAllBytes());
-
-            assertEquals(body, responseBody);
-
-            container.stop();
-        }
+        assertEquals(body, responseBody);
     }
 
     @Test
-    public void cephMMONTest() {
-        HashSet<String> features = new HashSet<>(Arrays.asList("rbd", "radosgw", "mon"));
-        try (CephContainer container = new CephContainer(CEPH_IMAGE, features)) {
-            container.start();
-            container.followOutput(new Slf4jLogConsumer(log).withPrefix("CEPH"));
+    public void cephMONTest() {
+        // Test MON service directly by checking TCP connectivity to MON port
+        String address = container.getHost();
+        Integer monPort = container.getMONPort();
 
-            // Test MON service directly by checking TCP connectivity to MON port
-            String address = container.getHost();
-            Integer monPort = container.getMONPort();
+        // Direct TCP connectivity test to MON service
+        try (Socket socket = new Socket()) {
+            socket.setSoTimeout(5000); // 5 second timeout
+            InetSocketAddress monAddress = new InetSocketAddress(address, monPort);
 
-            // Direct TCP connectivity test to MON service
-            try (Socket socket = new Socket()) {
-                socket.setSoTimeout(5000); // 5 second timeout
-                InetSocketAddress monAddress = new InetSocketAddress(address, monPort);
+            log.info("Testing direct connectivity to MON service at {}:{}", address, monPort);
+            socket.connect(monAddress, 5000);
 
-                log.info("Testing direct connectivity to MON service at {}:{}", address, monPort);
-                socket.connect(monAddress, 5000);
+            // If we reach here, the connection was successful
+            log.info("Successfully connected to MON service at {}:{}", address, monPort);
 
-                // If we reach here, the connection was successful
-                log.info("Successfully connected to MON service at {}:{}", address, monPort);
+            // Additional verification: MON should accept and close connections gracefully
+            // This indicates the MON daemon is listening and responding
+            assertEquals(true, socket.isConnected(), "MON port should be accessible");
 
-                // Additional verification: MON should accept and close connections gracefully
-                // This indicates the MON daemon is listening and responding
-                assertEquals(true, socket.isConnected(), "MON port should be accessible");
+        } catch (SocketTimeoutException e) {
+            log.error("Timeout connecting to MON service at {}:{}", address, monPort);
+            throw new RuntimeException("MON service connection timeout", e);
+        } catch (IOException e) {
+            log.error("Failed to connect to MON service at {}:{}: {}", address, monPort, e.getMessage());
+            throw new RuntimeException("MON service not accessible", e);
+        }
 
-            } catch (SocketTimeoutException e) {
-                log.error("Timeout connecting to MON service at {}:{}", address, monPort);
-                throw new RuntimeException("MON service connection timeout", e);
-            } catch (IOException e) {
-                log.error("Failed to connect to MON service at {}:{}: {}", address, monPort, e.getMessage());
-                throw new RuntimeException("MON service not accessible", e);
+        // Optional: Also verify via MGR API for comprehensive check
+        Integer mgrPort = container.getMappedPort(MGR_PORT);
+        String authUrl = String.format("http://%s:%d/api/auth", address, mgrPort);
+        String authBody = String.format("{\"username\": \"%s\", \"password\": \"%s\"}", MGR_USERNAME, MGR_PASSWORD);
+        byte[] authData = authBody.getBytes(StandardCharsets.UTF_8);
+
+        try {
+            URL url = new URI(authUrl).toURL();
+            HttpURLConnection authConn = (HttpURLConnection) url.openConnection();
+            authConn.setRequestMethod("POST");
+            authConn.setRequestProperty("accept", "application/vnd.ceph.api.v1.0+json");
+            authConn.setRequestProperty("Content-Type", "application/json");
+            authConn.setDoOutput(true);
+            try (OutputStream os = authConn.getOutputStream()) {
+                os.write(authData);
             }
+            int authResponseCode = authConn.getResponseCode();
+            assertEquals(201, authResponseCode, "MGR authentication should succeed");
 
-            // Optional: Also verify via MGR API for comprehensive check
-            Integer mgrPort = container.getMappedPort(MGR_PORT);
-            String authUrl = String.format("http://%s:%d/api/auth", address, mgrPort);
-            String authBody = String.format("{\"username\": \"%s\", \"password\": \"%s\"}", MGR_USERNAME, MGR_PASSWORD);
-            byte[] authData = authBody.getBytes(StandardCharsets.UTF_8);
-
-            try {
-                URL url = new URI(authUrl).toURL();
-                HttpURLConnection authConn = (HttpURLConnection) url.openConnection();
-                authConn.setRequestMethod("POST");
-                authConn.setRequestProperty("accept", "application/vnd.ceph.api.v1.0+json");
-                authConn.setRequestProperty("Content-Type", "application/json");
-                authConn.setDoOutput(true);
-                try (OutputStream os = authConn.getOutputStream()) {
-                    os.write(authData);
-                }
-                int authResponseCode = authConn.getResponseCode();
-                assertEquals(201, authResponseCode, "MGR authentication should succeed");
-
-                log.info("MON service verified: Direct TCP connection successful and MGR can authenticate");
-            } catch (Exception e) {
-                log.warn("MGR authentication failed, but direct MON connection succeeded: {}", e.getMessage());
-                // Don't fail the test if direct MON connection worked
-            }
-
-            container.stop();
+            log.info("MON service verified: Direct TCP connection successful and MGR can authenticate");
+        } catch (Exception e) {
+            log.warn("MGR authentication failed, but direct MON connection succeeded: {}", e.getMessage());
+            // Don't fail the test if direct MON connection worked
         }
     }
 
     @Test
     public void cephClusterIdTest() {
-        HashSet<String> features = new HashSet<>(Arrays.asList("rbd", "radosgw", "mon"));
-        try (CephContainer container = new CephContainer(CEPH_IMAGE, features)) {
-            container.start();
-            container.followOutput(new Slf4jLogConsumer(log).withPrefix("CEPH"));
-            String clusterId = container.getClusterId();
-            assertEquals(true, clusterId != null && !clusterId.isEmpty(), "Cluster ID should not be empty");
-            container.stop();
-        }
+        String clusterId = container.getClusterId();
+        assertNotNull(clusterId, "Cluster ID should not be null");
+        assertFalse(clusterId.isEmpty(), "Cluster ID should not be empty");
     }
 }

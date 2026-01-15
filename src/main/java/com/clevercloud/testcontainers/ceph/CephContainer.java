@@ -11,6 +11,7 @@ import java.util.Collections;
 import java.util.HashSet;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.testcontainers.containers.output.Slf4jLogConsumer;
 
 public class CephContainer extends GenericContainer<CephContainer> {
     private static final DockerImageName DEFAULT_IMAGE_NAME = DockerImageName.parse("clevercloud/testcontainer-ceph");
@@ -60,6 +61,9 @@ public class CephContainer extends GenericContainer<CephContainer> {
                 .withUsername(MGR_USERNAME)
                 .withPassword(MGR_PASSWORD)
                 .withTimeout(Duration.ofMinutes(2)));
+
+        // Log all container output for debugging
+        withLogConsumer(new Slf4jLogConsumer(log).withPrefix("CEPH"));
     }
 
     public String getDashboardUsername() {
