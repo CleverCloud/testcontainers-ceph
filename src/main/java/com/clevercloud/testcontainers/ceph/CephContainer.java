@@ -4,8 +4,13 @@ import org.testcontainers.containers.GenericContainer;
 
 import org.testcontainers.utility.DockerImageName;
 
+import java.io.IOException;
+import java.io.OutputStream;
+import java.net.HttpURLConnection;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Collections;
 import java.util.HashSet;
@@ -15,7 +20,7 @@ import org.testcontainers.containers.output.Slf4jLogConsumer;
 
 public class CephContainer extends GenericContainer<CephContainer> {
     private static final DockerImageName DEFAULT_IMAGE_NAME = DockerImageName.parse("clevercloud/testcontainer-ceph");
-    private static final String DEFAULT_TAG = "reef-20250721";
+    private static final String DEFAULT_TAG = "reef-20260420.1";
     private static final Integer CEPH_MON_DEFAULT_PORT = 3300;
     private static final Integer CEPH_RGW_DEFAULT_PORT = 7480;
     private static final Integer MGR_PORT = 8080;
@@ -129,9 +134,61 @@ public class CephContainer extends GenericContainer<CephContainer> {
     }
 
     /**
+     * Initializes a pool for RBD usage via the dashboard API
+     * (POST /api/pool/{pool_name}/init — backported from upstream).
+     *
+     * @param poolName pool to initialize
+     * @param force    re-initialize even if already initialized
+     * @return HTTP response code from the dashboard
+     */
+    public int initPool(String poolName, boolean force) {
+        try {
+            String token = dashboardAuthToken();
+            URL url = new URI(String.format("%s/pool/%s/init", getDashboardApiUrl(), poolName)).toURL();
+            HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+            conn.setRequestMethod("POST");
+            conn.setRequestProperty("Accept", "application/vnd.ceph.api.v1.0+json");
+            conn.setRequestProperty("Content-Type", "application/json");
+            conn.setRequestProperty("Authorization", "Bearer " + token);
+            conn.setDoOutput(true);
+            byte[] body = String.format("{\"force\": %b}", force).getBytes(StandardCharsets.UTF_8);
+            try (OutputStream os = conn.getOutputStream()) {
+                os.write(body);
+            }
+            int code = conn.getResponseCode();
+            log.info("initPool({}, force={}) -> HTTP {}", poolName, force, code);
+            return code;
+        } catch (IOException | URISyntaxException e) {
+            throw new RuntimeException("Failed to init pool " + poolName, e);
+        }
+    }
+
+    private String dashboardAuthToken() throws IOException, URISyntaxException {
+        URL url = new URI(getDashboardApiUrl() + "/auth").toURL();
+        HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+        conn.setRequestMethod("POST");
+        conn.setRequestProperty("Accept", "application/vnd.ceph.api.v1.0+json");
+        conn.setRequestProperty("Content-Type", "application/json");
+        conn.setDoOutput(true);
+        byte[] body = String.format("{\"username\":\"%s\",\"password\":\"%s\"}", MGR_USERNAME, MGR_PASSWORD)
+                .getBytes(StandardCharsets.UTF_8);
+        try (OutputStream os = conn.getOutputStream()) {
+            os.write(body);
+        }
+        if (conn.getResponseCode() != 201) {
+            throw new IOException("Dashboard auth failed: HTTP " + conn.getResponseCode());
+        }
+        String resp = new String(conn.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+        int idx = resp.indexOf("\"token\"");
+        int start = resp.indexOf('"', resp.indexOf(':', idx) + 1) + 1;
+        int end = resp.indexOf('"', start);
+        return resp.substring(start, end);
+    }
+
+    /**
      * Retrieves the Ceph cluster ID (FSID) from the running container.
      * The cluster ID is a unique identifier for the Ceph cluster.
-     * 
+     *
      * @return the Ceph cluster ID as a String
      * @throws RuntimeException if the cluster ID cannot be retrieved
      */

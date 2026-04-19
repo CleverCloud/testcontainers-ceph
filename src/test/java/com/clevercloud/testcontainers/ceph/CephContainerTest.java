@@ -31,11 +31,12 @@ import java.util.HashSet;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class CephContainerTest {
     private static final Logger log = LoggerFactory.getLogger(CephContainerTest.class);
 
-    private static final String CEPH_IMAGE = "reef-20250513";
+    private static final String CEPH_IMAGE = "reef-20260420.1";
     private static final String RGW_BUCKET_TEST = "testcontainers-ceph";
     private static final String RGW_BUCKET_OBJECT_TEST = "testcontainers-ceph-object";
     private static final String MGR_USERNAME = "admin";
@@ -163,6 +164,13 @@ public class CephContainerTest {
             log.warn("MGR authentication failed, but direct MON connection succeeded: {}", e.getMessage());
             // Don't fail the test if direct MON connection worked
         }
+    }
+
+    @Test
+    public void cephPoolInitTest() {
+        int code = container.initPool("rbd", false);
+        // @pool_task makes the endpoint async — 200/201 on immediate completion, 202 on task dispatch.
+        assertTrue(code >= 200 && code < 300, "init pool should succeed, got HTTP " + code);
     }
 
     @Test
