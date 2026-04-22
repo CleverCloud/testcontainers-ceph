@@ -8,9 +8,12 @@ import org.testcontainers.containers.output.Slf4jLogConsumer;
 
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
+import software.amazon.awssdk.core.checksums.RequestChecksumCalculation;
+import software.amazon.awssdk.core.checksums.ResponseChecksumValidation;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.S3ClientBuilder;
 import software.amazon.awssdk.services.s3.model.CreateBucketRequest;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.model.HeadBucketRequest;
@@ -109,8 +112,15 @@ public class CephContainerTest {
         URI endpointUri = container.getRGWUri();
         AwsBasicCredentials awsCreds = AwsBasicCredentials.create(container.getRGWAccessKey(),
                 container.getRGWSecretKey());
-        S3Client s3 = S3Client.builder().endpointOverride(endpointUri).region(Region.of("default"))
-                .credentialsProvider(StaticCredentialsProvider.create(awsCreds)).build();
+        S3ClientBuilder builder = S3Client.builder().endpointOverride(endpointUri).region(Region.of("default"))
+                .credentialsProvider(StaticCredentialsProvider.create(awsCreds));
+        if (TRACK == CephContainer.Track.PACIFIC) {
+            // pacific's radosgw (16.x) rejects the CRC32 trailer / STREAMING-UNSIGNED-PAYLOAD-TRAILER
+            // transfer that AWS SDK v2 >=2.30 emits by default.
+            builder.requestChecksumCalculation(RequestChecksumCalculation.WHEN_REQUIRED)
+                    .responseChecksumValidation(ResponseChecksumValidation.WHEN_REQUIRED);
+        }
+        S3Client s3 = builder.build();
         s3.createBucket(CreateBucketRequest.builder().bucket(RGW_BUCKET_TEST).build());
         s3.waiter().waitUntilBucketExists(HeadBucketRequest.builder().bucket(RGW_BUCKET_TEST).build());
 
