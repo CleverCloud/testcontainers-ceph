@@ -27,6 +27,7 @@ import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.HashSet;
+import java.util.Locale;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -36,9 +37,20 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 public class CephContainerTest {
     private static final Logger log = LoggerFactory.getLogger(CephContainerTest.class);
 
-    private static final CephContainer.Track TRACK = CephContainer.Track
-            .valueOf(System.getProperty("ceph.track", CephContainer.Track.REEF.name()).toUpperCase());
+    private static final CephContainer.Track TRACK = parseTrack(
+            System.getProperty("ceph.track", CephContainer.Track.REEF.name()));
     private static final String DATE = System.getProperty("ceph.date", CephContainer.defaultDate());
+
+    private static CephContainer.Track parseTrack(String value) {
+        try {
+            return CephContainer.Track.valueOf(value.toUpperCase(Locale.ROOT));
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException(
+                    "Invalid ceph.track='" + value + "'. Supported: "
+                            + Arrays.toString(CephContainer.Track.values()).toLowerCase(Locale.ROOT),
+                    e);
+        }
+    }
     private static final String RGW_BUCKET_TEST = "testcontainers-ceph";
     private static final String RGW_BUCKET_OBJECT_TEST = "testcontainers-ceph-object";
     private static final String MGR_USERNAME = "admin";

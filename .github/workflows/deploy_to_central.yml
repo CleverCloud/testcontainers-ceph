@@ -26,6 +26,7 @@ jobs:
           server-id: central
           server-username: MAVEN_USERNAME
           server-password: MAVEN_PASSWORD
+          cache: "maven"
       - name: Set pom version from release tag
         run: mvn -B versions:set -DnewVersion=${{ github.event.release.tag_name }} -DgenerateBackupPoms=false
       - name: Publish package
