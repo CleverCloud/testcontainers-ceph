@@ -36,7 +36,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 public class CephContainerTest {
     private static final Logger log = LoggerFactory.getLogger(CephContainerTest.class);
 
-    private static final String CEPH_IMAGE = "reef-20260420.1";
+    private static final CephContainer.Track TRACK = CephContainer.Track
+            .valueOf(System.getProperty("ceph.track", CephContainer.Track.REEF.name()).toUpperCase());
+    private static final String DATE = System.getProperty("ceph.date", CephContainer.defaultDate());
     private static final String RGW_BUCKET_TEST = "testcontainers-ceph";
     private static final String RGW_BUCKET_OBJECT_TEST = "testcontainers-ceph-object";
     private static final String MGR_USERNAME = "admin";
@@ -44,7 +46,7 @@ public class CephContainerTest {
     private static final Integer MGR_PORT = 8080;
 
     // Shared container for all tests - uses all features needed by tests
-    private static final CephContainer container = new CephContainer(CEPH_IMAGE,
+    private static final CephContainer container = new CephContainer(TRACK, DATE,
             new HashSet<>(Arrays.asList("rbd", "radosgw", "mon")));
 
     @org.junit.jupiter.api.BeforeAll

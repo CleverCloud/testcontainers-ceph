@@ -5,6 +5,7 @@ import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.utility.DockerImageName;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URI;
@@ -14,13 +15,41 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.Properties;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.output.Slf4jLogConsumer;
 
 public class CephContainer extends GenericContainer<CephContainer> {
+    public enum Track {
+        PACIFIC,
+        REEF;
+
+        public String prefix() {
+            return name().toLowerCase();
+        }
+    }
+
     private static final DockerImageName DEFAULT_IMAGE_NAME = DockerImageName.parse("clevercloud/testcontainer-ceph");
-    private static final String DEFAULT_TAG = "reef-20260420.1";
+    private static final Track DEFAULT_TRACK = Track.REEF;
+    private static final String DEFAULT_DATE;
+
+    static {
+        try (InputStream is = CephContainer.class.getResourceAsStream("/ceph-testcontainer.properties")) {
+            if (is == null) {
+                throw new ExceptionInInitializerError("ceph-testcontainer.properties missing from classpath");
+            }
+            Properties props = new Properties();
+            props.load(is);
+            DEFAULT_DATE = props.getProperty("default.date");
+            if (DEFAULT_DATE == null || DEFAULT_DATE.isEmpty() || DEFAULT_DATE.contains("${")) {
+                throw new ExceptionInInitializerError("default.date not resolved (resource filtering disabled?)");
+            }
+        } catch (IOException e) {
+            throw new ExceptionInInitializerError(e);
+        }
+    }
+
     private static final Integer CEPH_MON_DEFAULT_PORT = 3300;
     private static final Integer CEPH_RGW_DEFAULT_PORT = 7480;
     private static final Integer MGR_PORT = 8080;
@@ -35,7 +64,19 @@ public class CephContainer extends GenericContainer<CephContainer> {
     private static final String MGR_PASSWORD = "admin";
 
     public CephContainer() {
-        this(DEFAULT_TAG);
+        this(DEFAULT_TRACK, DEFAULT_DATE);
+    }
+
+    public CephContainer(Track track) {
+        this(track, DEFAULT_DATE);
+    }
+
+    public CephContainer(Track track, String date) {
+        this(track.prefix() + "-" + date);
+    }
+
+    public CephContainer(Track track, String date, HashSet<String> features) {
+        this(track.prefix() + "-" + date, features);
     }
 
     public CephContainer(final String tag) {
@@ -84,7 +125,15 @@ public class CephContainer extends GenericContainer<CephContainer> {
     }
 
     public String getDefaultTag() {
-        return DEFAULT_TAG;
+        return defaultTag();
+    }
+
+    public static String defaultTag() {
+        return DEFAULT_TRACK.prefix() + "-" + DEFAULT_DATE;
+    }
+
+    public static String defaultDate() {
+        return DEFAULT_DATE;
     }
 
     public String getRGWHTTPHost() {

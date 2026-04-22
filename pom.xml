@@ -8,7 +8,7 @@
     <artifactId>testcontainers-ceph</artifactId>
     <name>testcontainers-ceph</name>
     <url>https://github.com/CleverCloud/testcontainers-ceph</url>
-    <version>20260420-reef</version>
+    <version>20260422.3</version>
 
     <description>Testcontainers implementation for Ceph, a distributed object, block, and file storage platform .</description>
 
@@ -108,6 +108,22 @@
     </profiles>
 
     <build>
+        <resources>
+            <resource>
+                <directory>src/main/resources</directory>
+                <filtering>true</filtering>
+                <includes>
+                    <include>ceph-testcontainer.properties</include>
+                </includes>
+            </resource>
+            <resource>
+                <directory>src/main/resources</directory>
+                <filtering>false</filtering>
+                <excludes>
+                    <exclude>ceph-testcontainer.properties</exclude>
+                </excludes>
+            </resource>
+        </resources>
         <plugins>
             <plugin>
                 <groupId>org.sonatype.central</groupId>
