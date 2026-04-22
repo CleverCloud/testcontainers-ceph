@@ -112,15 +112,7 @@ public class CephContainerTest {
         URI endpointUri = container.getRGWUri();
         AwsBasicCredentials awsCreds = AwsBasicCredentials.create(container.getRGWAccessKey(),
                 container.getRGWSecretKey());
-        S3ClientBuilder builder = S3Client.builder().endpointOverride(endpointUri).region(Region.of("default"))
-                .credentialsProvider(StaticCredentialsProvider.create(awsCreds));
-        if (TRACK == CephContainer.Track.PACIFIC) {
-            // pacific's radosgw (16.x) rejects the CRC32 trailer / STREAMING-UNSIGNED-PAYLOAD-TRAILER
-            // transfer that AWS SDK v2 >=2.30 emits by default.
-            builder.requestChecksumCalculation(RequestChecksumCalculation.WHEN_REQUIRED)
-                    .responseChecksumValidation(ResponseChecksumValidation.WHEN_REQUIRED);
-        }
-        S3Client s3 = builder.build();
+        S3Client s3 = s3ClientFor(TRACK, endpointUri, awsCreds);
         s3.createBucket(CreateBucketRequest.builder().bucket(RGW_BUCKET_TEST).build());
         s3.waiter().waitUntilBucketExists(HeadBucketRequest.builder().bucket(RGW_BUCKET_TEST).build());
 
@@ -239,5 +231,17 @@ public class CephContainerTest {
             log.warn("Exception during connection test: {}", e.getMessage());
             throw new RuntimeException(e);
         }
+    }
+
+    private static S3Client s3ClientFor(CephContainer.Track track, URI endpoint, AwsBasicCredentials creds) {
+        S3ClientBuilder builder = S3Client.builder().endpointOverride(endpoint).region(Region.of("default"))
+                .credentialsProvider(StaticCredentialsProvider.create(creds));
+        if (track == CephContainer.Track.PACIFIC) {
+            // Pacific's radosgw predates flexible checksums (added SDK v2 ≥ 2.30); opt out of the
+            // STREAMING-UNSIGNED-PAYLOAD-TRAILER wire format it doesn't understand.
+            builder.requestChecksumCalculation(RequestChecksumCalculation.WHEN_REQUIRED)
+                    .responseChecksumValidation(ResponseChecksumValidation.WHEN_REQUIRED);
+        }
+        return builder.build();
     }
 }
