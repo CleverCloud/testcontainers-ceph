@@ -212,6 +212,61 @@ public class CephContainer extends GenericContainer<CephContainer> {
         }
     }
 
+    /**
+     * Creates a CephX user via the dashboard API
+     * (POST /api/cluster/user — native on Reef, backported on Pacific).
+     *
+     * @param entity user entity, e.g. {@code client.foo}
+     * @param monCap mon capability string, e.g. {@code allow r}
+     * @return HTTP response code from the dashboard
+     */
+    public int createCephUser(String entity, String monCap) {
+        try {
+            String token = dashboardAuthToken();
+            URL url = new URI(getDashboardApiUrl() + "/cluster/user").toURL();
+            HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+            conn.setRequestMethod("POST");
+            conn.setRequestProperty("Accept", "application/vnd.ceph.api.v1.0+json");
+            conn.setRequestProperty("Content-Type", "application/json");
+            conn.setRequestProperty("Authorization", "Bearer " + token);
+            conn.setDoOutput(true);
+            byte[] body = String.format(
+                    "{\"user_entity\":\"%s\",\"capabilities\":[{\"entity\":\"mon\",\"cap\":\"%s\"}]}",
+                    entity, monCap).getBytes(StandardCharsets.UTF_8);
+            try (OutputStream os = conn.getOutputStream()) {
+                os.write(body);
+            }
+            int code = conn.getResponseCode();
+            log.info("createCephUser({}) -> HTTP {}", entity, code);
+            return code;
+        } catch (IOException | URISyntaxException e) {
+            throw new RuntimeException("Failed to create ceph user " + entity, e);
+        }
+    }
+
+    /**
+     * Deletes a CephX user via the dashboard API
+     * (DELETE /api/cluster/user/{entity} — native on Reef, backported on Pacific).
+     *
+     * @param entity user entity, e.g. {@code client.foo}
+     * @return HTTP response code from the dashboard
+     */
+    public int deleteCephUser(String entity) {
+        try {
+            String token = dashboardAuthToken();
+            URL url = new URI(getDashboardApiUrl() + "/cluster/user/" + entity).toURL();
+            HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+            conn.setRequestMethod("DELETE");
+            conn.setRequestProperty("Accept", "application/vnd.ceph.api.v1.0+json");
+            conn.setRequestProperty("Authorization", "Bearer " + token);
+            int code = conn.getResponseCode();
+            log.info("deleteCephUser({}) -> HTTP {}", entity, code);
+            return code;
+        } catch (IOException | URISyntaxException e) {
+            throw new RuntimeException("Failed to delete ceph user " + entity, e);
+        }
+    }
+
     private String dashboardAuthToken() throws IOException, URISyntaxException {
         URL url = new URI(getDashboardApiUrl() + "/auth").toURL();
         HttpURLConnection conn = (HttpURLConnection) url.openConnection();

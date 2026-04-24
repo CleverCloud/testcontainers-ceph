@@ -190,6 +190,20 @@ public class CephContainerTest {
     }
 
     @Test
+    public void cephUserCreateAndDeleteTest() {
+        String entity = "client.testcontainers-"
+                + RandomStringUtils.randomAlphanumeric(8).toLowerCase();
+
+        int createCode = container.createCephUser(entity, "allow r");
+        assertTrue(createCode >= 200 && createCode < 300,
+                "create ceph user should succeed, got HTTP " + createCode);
+
+        int deleteCode = container.deleteCephUser(entity);
+        assertTrue(deleteCode >= 200 && deleteCode < 300,
+                "delete ceph user should succeed, got HTTP " + deleteCode);
+    }
+
+    @Test
     public void cephClusterIdTest() {
         String clusterId = container.getClusterId();
         assertNotNull(clusterId, "Cluster ID should not be null");
